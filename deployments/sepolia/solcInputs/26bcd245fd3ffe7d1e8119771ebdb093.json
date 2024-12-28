@@ -1,0 +1,36 @@
+{
+  "language": "Solidity",
+  "sources": {
+    "contracts/Campaigns.sol": {
+      "content": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.8;\n\ncontract CrowdFund {\n    uint256 public campaignId = 0;\n\n    enum State {\n        OPEN,\n        CLOSED\n    }\n\n    struct Campaign {\n        uint256 i_minAmount;\n        uint256 i_maxAmount;\n        uint256 i_maxTime;\n        address campaignOwner;\n        uint256 campaignId;\n        address[] Contributors;\n        State state;\n        uint256 totalFund;\n    }\n\n    Campaign[] private campaign;\n\n    event CampaignFunded(address indexed contributor, uint256 amount);\n    event RemainingETHSent(address indexed recipient, uint256 amount);\n\n    error ErrorInSendingETH();\n    error NotEnoughETHEntered();\n    error CampaignClosed();\n    error InvalidCampaign();\n\n    function createCampaign(\n        uint256 _minAmount,\n        uint256 _maxAmount,\n        uint256 _maxTime\n    ) public {\n        campaign.push(\n            Campaign({\n                i_minAmount: _minAmount,\n                i_maxAmount: _maxAmount,\n                i_maxTime: _maxTime,\n                campaignOwner: msg.sender,\n                campaignId: campaignId,\n                Contributors: new address[](0),\n                state: State.OPEN,\n                totalFund: 0\n            })\n        );\n        campaignId++;\n    }\n\n    function fundCampaign(uint256 cid) public payable {\n        require(cid < campaign.length, \"Invalid campaign ID\");\n        Campaign storage selectedCampaign = campaign[cid];\n\n        if (selectedCampaign.state != State.OPEN) {\n            revert CampaignClosed();\n        }\n\n        uint256 donatedETH = msg.value;\n\n        if (donatedETH < selectedCampaign.i_minAmount) {\n            revert NotEnoughETHEntered();\n        }\n\n        if (selectedCampaign.totalFund + donatedETH > selectedCampaign.i_maxAmount) {\n            uint256 acceptedETH = selectedCampaign.i_maxAmount - selectedCampaign.totalFund;\n            uint256 willReturnETH = donatedETH - acceptedETH;\n\n            selectedCampaign.totalFund += acceptedETH;\n            selectedCampaign.state = State.CLOSED;\n\n            (bool success, ) = msg.sender.call{value: willReturnETH}(\"\");\n            if (!success) revert ErrorInSendingETH();\n\n            emit RemainingETHSent(msg.sender, willReturnETH);\n            \n        } else {\n            selectedCampaign.totalFund += donatedETH;\n            selectedCampaign.Contributors.push(msg.sender);\n\n            (bool success, ) = selectedCampaign.campaignOwner.call{value: donatedETH}(\"\");\n            if (!success) revert ErrorInSendingETH();\n\n            emit CampaignFunded(msg.sender, donatedETH);\n        }\n    }\n\n    function getContributors(uint256 cid) public view returns (address[] memory) {\n        require(cid < campaign.length, \"Invalid campaign ID\");\n        return campaign[cid].Contributors;\n    }\n\n    function getTotalFunds(uint256 cid) public view returns (uint256) {\n        require(cid < campaign.length, \"Invalid campaign ID\");\n        return campaign[cid].totalFund;\n    }\n\n    function getCampaignOwner(uint256 cid) public view returns (address) {\n        require(cid < campaign.length, \"Invalid campaign ID\");\n        return campaign[cid].campaignOwner;\n    }\n\n    function getState(uint256 cid) public view returns (State) {\n        require(cid < campaign.length, \"Invalid campaign ID\");\n        return campaign[cid].state;\n    }\n}\n"
+    }
+  },
+  "settings": {
+    "evmVersion": "paris",
+    "optimizer": {
+      "enabled": false,
+      "runs": 200
+    },
+    "outputSelection": {
+      "*": {
+        "*": [
+          "abi",
+          "evm.bytecode",
+          "evm.deployedBytecode",
+          "evm.methodIdentifiers",
+          "metadata",
+          "devdoc",
+          "userdoc",
+          "storageLayout",
+          "evm.gasEstimates"
+        ],
+        "": [
+          "ast"
+        ]
+      }
+    },
+    "metadata": {
+      "useLiteralContent": true
+    }
+  }
+}
